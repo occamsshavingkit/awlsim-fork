@@ -1,0 +1,26 @@
+ORGANIZATION_BLOCK OB 1
+	VAR_TEMP
+		RET_TMP		: INT;
+		CDT_TMP		: DATE_AND_TIME;
+	END_VAR
+BEGIN
+	// Test SFC 1: READ_CLK
+	// SFC 1 reads the system wall-clock time and writes it as an 8-byte
+	// BCD DATE_AND_TIME. No SFC-specific error codes; only general 8xyy
+	// errors are possible. Happy path: RET_VAL = W#16#0000, BIE = 1.
+	//
+	// We do not assert the actual date/time bytes - they are wall-clock
+	// dependent. The Python-side unit test covers the byte encoding.
+
+
+	CALL		SFC 1 (
+		RET_VAL	:= #RET_TMP,
+		CDT	:= #CDT_TMP,
+	)
+	__ASSERT==	__STW BIE,	1
+	L		#RET_TMP
+	__ASSERT==	__ACCU 1,	W#16#0000
+
+
+	CALL SFC 46 // STOP CPU
+END_ORGANIZATION_BLOCK
