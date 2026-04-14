@@ -1,0 +1,61 @@
+DATA_BLOCK DB 1
+STRUCT
+	DT1	: DATE_AND_TIME := DT#1995-01-15-10:30:30.000;
+END_STRUCT;
+BEGIN
+END_DATA_BLOCK
+
+
+ORGANIZATION_BLOCK OB 1
+	VAR_TEMP
+		RET_TMP		: INT;
+	END_VAR
+BEGIN
+	// Test SFC 0: SET_CLK
+	// SFC 0 sets the system wall-clock from an 8-byte BCD DATE_AND_TIME.
+	// RET_VAL = 0x0000 OK, 0x8080 invalid date, 0x8081 invalid time
+	// (SFC_e ch 5.1).
+
+
+	// Case 1: valid DT - expect RET_VAL=0, BIE=1
+	CALL		SFC 0 (
+		PDT	:= DB1.DT1,
+		RET_VAL	:= #RET_TMP,
+	)
+	__ASSERT==	__STW BIE,	1
+	L		#RET_TMP
+	__ASSERT==	__ACCU 1,	W#16#0000
+
+
+	// Case 2: clobber month byte to BCD 0x13 (month=13) - expect 0x8080
+	AUF		DB 1
+	L		B#16#13
+	T		DBB 1
+
+	CALL		SFC 0 (
+		PDT	:= DB1.DT1,
+		RET_VAL	:= #RET_TMP,
+	)
+	__ASSERT==	__STW BIE,	0
+	L		#RET_TMP
+	__ASSERT==	__ACCU 1,	W#16#8080
+
+
+	// Case 3: restore month, clobber hour to BCD 0x25 (hour=25) - expect 0x8081
+	AUF		DB 1
+	L		B#16#01
+	T		DBB 1
+	L		B#16#25
+	T		DBB 3
+
+	CALL		SFC 0 (
+		PDT	:= DB1.DT1,
+		RET_VAL	:= #RET_TMP,
+	)
+	__ASSERT==	__STW BIE,	0
+	L		#RET_TMP
+	__ASSERT==	__ACCU 1,	W#16#8081
+
+
+	CALL SFC 46 // STOP CPU
+END_ORGANIZATION_BLOCK
