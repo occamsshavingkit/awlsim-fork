@@ -1,0 +1,85 @@
+ORGANIZATION_BLOCK OB 1
+	VAR_TEMP
+		NR_TMP		: BYTE;
+		RET_TMP		: INT;
+		CQ_TMP		: BOOL;
+		CV_TMP		: INT;
+	END_VAR
+BEGIN
+	// Test SFC 4: READ_RTM
+
+
+	// Valid meter number (0) on a fresh CPU: meter stopped, value 0.
+	L		B#16#00
+	T		#NR_TMP
+	CALL		SFC 4 (
+		NR	:= #NR_TMP,
+		RET_VAL	:= #RET_TMP,
+		CQ	:= #CQ_TMP,
+		CV	:= #CV_TMP,
+	)
+	__ASSERT==	__STW BIE,	1
+	L		#RET_TMP
+	__ASSERT==	__ACCU 1,	W#16#0000
+	L		#CV_TMP
+	__ASSERT==	__ACCU 1,	W#16#0000
+	U		#CQ_TMP
+	__ASSERT==	__STW VKE,	0
+
+
+	// Valid meter number (7, the maximum) - same expected state.
+	L		B#16#07
+	T		#NR_TMP
+	CALL		SFC 4 (
+		NR	:= #NR_TMP,
+		RET_VAL	:= #RET_TMP,
+		CQ	:= #CQ_TMP,
+		CV	:= #CV_TMP,
+	)
+	__ASSERT==	__STW BIE,	1
+	L		#RET_TMP
+	__ASSERT==	__ACCU 1,	W#16#0000
+	L		#CV_TMP
+	__ASSERT==	__ACCU 1,	W#16#0000
+	U		#CQ_TMP
+	__ASSERT==	__STW VKE,	0
+
+
+	// Invalid meter number (8): E_RPARM on parameter 1, BIE cleared.
+	L		B#16#08
+	T		#NR_TMP
+	CALL		SFC 4 (
+		NR	:= #NR_TMP,
+		RET_VAL	:= #RET_TMP,
+		CQ	:= #CQ_TMP,
+		CV	:= #CV_TMP,
+	)
+	__ASSERT==	__STW BIE,	0
+	L		#RET_TMP
+	__ASSERT==	__ACCU 1,	W#16#8080
+	L		#CV_TMP
+	__ASSERT==	__ACCU 1,	W#16#0000
+	U		#CQ_TMP
+	__ASSERT==	__STW VKE,	0
+
+
+	// Invalid meter number (255, max BYTE): same error path.
+	L		B#16#FF
+	T		#NR_TMP
+	CALL		SFC 4 (
+		NR	:= #NR_TMP,
+		RET_VAL	:= #RET_TMP,
+		CQ	:= #CQ_TMP,
+		CV	:= #CV_TMP,
+	)
+	__ASSERT==	__STW BIE,	0
+	L		#RET_TMP
+	__ASSERT==	__ACCU 1,	W#16#8080
+	L		#CV_TMP
+	__ASSERT==	__ACCU 1,	W#16#0000
+	U		#CQ_TMP
+	__ASSERT==	__STW VKE,	0
+
+
+	CALL SFC 46 // STOP CPU
+END_ORGANIZATION_BLOCK
