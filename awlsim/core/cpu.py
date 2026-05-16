@@ -2357,7 +2357,26 @@ class S7CPU(object): #+cdef
 			self.__fetchWidthError(operator, allowedWidths)
 		operatorOffset = operator.offset
 
-		isInProcImg = operatorOffset.toLongBitOffset() + bitWidth < self.specs.nrInputs * 8
+		isInProcImg = operatorOffset.toLongBitOffset() + bitWidth <= self.specs.nrInputs * 8
+		if bitWidth == 1:
+			readBytes = self.cbPeripheralRead(self.cbPeripheralReadData,
+							  8,
+							  operatorOffset.byteOffset)
+			if not readBytes:
+				printError("There is no hardware to handle "
+					"the direct peripheral fetch. "
+					"(width=%d, offset=%d)" %\
+					(8, operatorOffset.byteOffset))
+				if isInProcImg:
+					return self.inputs.fetch(operatorOffset, bitWidth)
+				return constMemObj_1bit_0
+			memObj = make_AwlMemoryObject_fromBytes(readBytes, 8)
+			if isInProcImg:
+				self.inputs.store(make_AwlOffset(operatorOffset.byteOffset, 0),
+						  memObj)
+			return (constMemObj_1bit_1 if
+				(readBytes[0] >> operatorOffset.bitOffset) & 1
+				else constMemObj_1bit_0)
 
 		# Fetch the data from the peripheral device.
 		readBytes = self.cbPeripheralRead(self.cbPeripheralReadData,
@@ -2666,6 +2685,7 @@ class S7CPU(object): #+cdef
 	def __storePA(self, operator, memObj, allowedWidths): #@nocy
 #@cy	cdef __storePA(self, AwlOperator operator, AwlMemoryObject memObj, uint32_t allowedWidths):
 #@cy		cdef _Bool ok
+#@cy		cdef _Bool isInProcImg
 #@cy		cdef uint32_t bitWidth
 #@cy		cdef AwlOffset operatorOffset
 
@@ -2674,9 +2694,20 @@ class S7CPU(object): #+cdef
 			self.__storeWidthError(operator, allowedWidths)
 		operatorOffset = operator.offset
 
+		isInProcImg = operatorOffset.toLongBitOffset() + bitWidth <= self.specs.nrOutputs * 8
+		if bitWidth == 1 and not isInProcImg:
+			raise AwlSimError("Direct peripheral bit store outside "
+				"the output process image is not supported.")
+
 		# Store the data to the process image, if it is within the outputs range.
-		if operatorOffset.toLongBitOffset() + bitWidth < self.specs.nrOutputs * 8:
+		if isInProcImg:
 			self.outputs.store(operatorOffset, memObj)
+
+		if bitWidth == 1:
+			bitWidth = 8
+			memObj = make_AwlMemoryObject_fromBytes(
+				self.fetchOutputRange(operatorOffset.byteOffset, 1),
+				bitWidth)
 
 		# Store the data to the peripheral device.
 		ok = self.cbPeripheralWrite(self.cbPeripheralWriteData,
